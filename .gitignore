@@ -1,0 +1,18 @@
+# Python
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+*.env
+env/
+venv/
+.Python
+db.sqlite3
+*.sqlite3
+
+# Django specific
+*.log
+local_settings.py
+media/
+staticfiles/
+node_modules/
