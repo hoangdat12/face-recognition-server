@@ -47,6 +47,9 @@ def update_device_information(request, device_id):
     
     for device_info in found_device["device_informations"]:
         if (device_info["name"] == device_info_name):
+            if (device_info["is_automate"] == device_automate):
+                return ResponseOk(message="Nothing change!")
+            
             device_info["is_automate"] = device_automate
             device_info["default_value"] = device_default_value
 

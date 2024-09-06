@@ -38,18 +38,19 @@ def authenticate_account(request):
             # Generate token
             if 'password' in found_account:
                 del found_account['password']
-
-            data = {
-                'user': found_account,
-                'refresh': token_pairs["refresh_token"],
-                'access': token_pairs["access_token"],
-            }
-
+            
             HistoryRepository.create_history(
                 device_id=found_account["device_id"], 
                 user_information=generate_user_information(found_account), 
                 authenticate_with= AuthenticateMethod.ACCOUNT.value
             )
+
+            found_account["image"] = S3Service.presigned_url(s3_bucket_employees, found_account["image"])
+            data = {
+                'user': found_account,
+                'refresh': token_pairs["refresh_token"],
+                'access': token_pairs["access_token"],
+            }
 
             return ResponseOk(data, message="Success")
 

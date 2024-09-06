@@ -74,17 +74,20 @@ def get_histories_response(histories):
         "histories": [],
         "start_key": histories[1]
     }
-    seen_dates = set()
+    # Remember these user is occur in history response array 
+    memo = set()
+
     for history in histories[0]:
         date_str = history["created_at"].split('T')[0]  # Kết quả là '2024-07-07'
+        key = f"${history['employee_information']['id']}_${date_str}"
 
-        if date_str not in seen_dates:
+        if key not in memo:
             history["quantity"] = history.get("quantity", 0) + 1
             history["employee_information"]["image"] = S3Service.presigned_url(
                 bucket_name=s3_bucket_employees, 
                 file_name=history["employee_information"]["image"]
             )
             response_data["histories"].append(history)
-            seen_dates.add(date_str)
+            memo.add(key)
 
     return response_data;
