@@ -32,7 +32,7 @@ ALLOWED_HOSTS = ['*']
 # Application definition
 
 INSTALLED_APPS = [
-    # 'daphne',
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -54,7 +54,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
 ]
 
-# ASGI_APPLICATION = 'face_recognition_server.asgi.application'
+ASGI_APPLICATION = 'face_recognition_server.asgi.application'
 
 ROOT_URLCONF = 'face_recognition_server.urls'
 
@@ -74,7 +74,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'face_recognition_server.wsgi.application'
+# WSGI_APPLICATION = 'face_recognition_server.wsgi.application'
 
 
 # Database
