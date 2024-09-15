@@ -88,15 +88,39 @@ class DeviceRepository:
     
     @staticmethod
     def save(device):
-        response = device_id_table.update_item(
-            Key={
-                'device_id': device["device_id"]  # Assuming 'device_id' is your primary key
-            },
-            UpdateExpression=f"SET device_informations = :information",
-            ExpressionAttributeValues={
-                ':information': device["device_informations"]
-            },
-            ReturnValues="UPDATED_NEW"
-        )
+        # Check if required fields are present
+        required_fields = ["device_id", "device_informations", "status", "private_key", "certificate", "public_key"]
+        for field in required_fields:
+            if field not in device:
+                raise ValueError(f"'{field}' must be provided.")
 
-        return response;
+        try:
+            # Update multiple attributes in DynamoDB
+            response = device_id_table.update_item(
+                Key={
+                    'device_id': device["device_id"]  # Assuming 'device_id' is your primary key
+                },
+                UpdateExpression="""SET device_informations = :information, 
+                                    #status = :status, 
+                                    private_key = :private_key, 
+                                    certificate = :certificate, 
+                                    public_key = :public_key""",
+                ExpressionAttributeNames={
+                    '#status': 'status'
+                },
+                ExpressionAttributeValues={
+                    ':information': device["device_informations"],
+                    ':status': device["status"],
+                    ':private_key': device["private_key"],
+                    ':certificate': device["certificate"],
+                    ':public_key': device["public_key"]
+                },
+                ReturnValues="UPDATED_NEW"
+            )
+
+            return response
+        
+        except Exception as e:
+            print(f"Failed to update device: {str(e)}")
+            return None  # Return None on failure
+

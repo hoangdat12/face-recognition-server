@@ -3,7 +3,7 @@ from rest_framework.decorators import api_view
 from ..repository import UserRepository, DeviceRepository
 from ..decorators import permission
 from ..constants import Role
-from ..services import S3Service
+from ..services import S3Service, AwsIoTService
 from rest_framework.decorators import api_view
 from ..responses import *
 from ..ultils.index import format_user, random_value
@@ -87,7 +87,7 @@ def get_employee_in_device(request, device_id):
 
 @api_view(["DELETE"])
 # @permission([Role.ADMIN.value, Role.SUPER.value])
-def disable_device(request, device_id):
+def disable_device(_, device_id):
     found_device = DeviceRepository.find_active_by_device_id(device_id)
     if not found_device:
         return ResponseNotFound(message=f"Device with id {device_id} not found")
@@ -105,3 +105,28 @@ def disable_device(request, device_id):
     #     UserRepository.update_user_status(device_user)
 
     return ResponseOk(message="Delete device success")
+
+@api_view(["GET"])
+# @permission([Role.ADMIN.value, Role.SUPER.value])
+def generate_certificate_for_device(_, device_id):
+    found_device = DeviceRepository.find_by_device_id(device_id)
+    if not found_device:
+        return ResponseNotFound(message=f"Device with id {device_id} not found")
+    
+    response_ctf = AwsIoTService.generate_certificate(device_id)
+
+    found_device["private_key"] = response_ctf["new_key_pem"]
+    found_device["certificate"] = response_ctf["new_cert_pem"]
+    found_device["public_key"] = response_ctf["new_public_key_pem"]
+    found_device["status"] = DeviceStatus.ACTIVE.value
+
+    update_response = DeviceRepository.save(found_device)
+    if update_response is None:
+        return ResponseInternalServerError(message="DB error")
+    
+    response_data = {
+        "cert_pem": response_ctf["new_cert_pem"],
+        "private_key": response_ctf["new_key_pem"],
+    }
+
+    return ResponseOk(message="Generate Certificate success!", data=response_data)

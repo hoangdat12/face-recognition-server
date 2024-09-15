@@ -35,6 +35,7 @@ urlpatterns = [
 
     # device
     path('device/generate', views.generate_device_id, name="generate_device_id"),
+    path('device/generate/certificate/<str:device_id>', views.generate_certificate_for_device, name="generate_certificate_for_device"),
     path('device/employee/<str:device_id>', views.get_employee_in_device, name="get_employee_in_device"),
     path('device/<str:device_id>', views.get_device_detail, name="get_device_detail"),
     path('device/<str:device_id>', views.disable_device, name="disable_device"),

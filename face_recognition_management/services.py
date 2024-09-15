@@ -1,9 +1,14 @@
-import boto3
-import os
 from botocore.exceptions import NoCredentialsError, PartialCredentialsError
 from botocore.exceptions import ClientError
-import jwt
 from datetime import datetime, timedelta, timezone
+from awscrt import io, mqtt
+from awsiot import mqtt_connection_builder
+import jwt
+import sys
+import time
+import os
+import boto3
+import json
 
 # Create S3 client
 s3_client = boto3.client('s3', region_name=os.environ.get('AWS_REGION'))
@@ -38,7 +43,6 @@ class S3Service:
             ExpiresIn=expired_in
         )
         return url
-
 
 class RekognitionService:
     @staticmethod
@@ -111,6 +115,202 @@ class RekognitionService:
             print(f"Error: {e}")
             response_message["message"] = "Face indexing failed!"
             return response_message
+        
+class AwsIoTService:
+    mqtt_connection = None  # Class-level attribute
+
+    # AWS IoT endpoint and file paths for certificates 
+    TARGET_EP = os.environ.get('AWS_IOT_TARGET_EP')
+    CLAIM_CERT_FILEPATH = os.path.join(os.getcwd(), 'face_recognition_management/secret/a5dae91d0da844e7c555593ff16a7b23f148b76e569cc507531332e1952b4043-certificate.pem.crt')
+    CLAIM_PRIVATE_KEY_FILE_PATH = os.path.join(os.getcwd(), 'face_recognition_management/secret/a5dae91d0da844e7c555593ff16a7b23f148b76e569cc507531332e1952b4043-private.pem.key')
+    CA_FILEPATH = os.path.join(os.getcwd(), 'face_recognition_management/secret/AmazonRootCA1.pem')
+
+    # AWS Resources name
+    POLICY_NAME = os.environ.get('AWS_IOT_POLICY_NAME')
+    PROVISIONING_TEMPLATE_NAME = os.environ.get('AWS_IOT_PROVISIONING_TEMPLATE_NAME')
+    AWS_REGION = os.environ.get('AWS_REGION')
+    AWS_IOT_THING_GROUP_NAME=os.environ.get('AWS_IOT_THING_GROUP_NAME')
+
+    # Setup for AWS IoT MQTT connection
+    EVENT_LOOP_GROUP = io.EventLoopGroup(1)
+    HOST_RESOLVER = io.DefaultHostResolver(EVENT_LOOP_GROUP)
+    CLIENT_BOOTSTRAP = io.ClientBootstrap(EVENT_LOOP_GROUP, HOST_RESOLVER)
+
+    @staticmethod
+    def generate_certificate(device_id):
+        """
+        Generate a new certificate by connecting with the claim certificate, 
+        requesting new keys and certificate from AWS IoT Core, and attaching 
+        the new certificate to a thing and policy.
+        
+        Returns:
+            bool: True if the process was successful, False otherwise.
+        """
+        thing_name = f"{AwsIoTService.PROVISIONING_TEMPLATE_NAME}_{device_id}"
+
+        # Connect to IoT Core using the claim certificate
+        mqtt_connection = AwsIoTService.connect_mqtt()
+        if mqtt_connection is None:
+            return None
+
+        # Create an IoT client to request new keys and certificate
+        iot_client = boto3.client('iot', region_name=AwsIoTService.AWS_REGION)
+
+        # Request new keys and certificate from AWS IoT Core
+        response = iot_client.create_keys_and_certificate(setAsActive=True)
+
+        # Extract the new certificate and private key
+        new_cert_arn = response['certificateArn']
+        new_cert_pem = response['certificatePem']
+        new_key_pem = response['keyPair']['PrivateKey']
+        new_public_key_pem = response['keyPair']['PublicKey']
+
+        # Attach the new certificate to a thing
+        iot_client.create_thing(thingName=thing_name)
+        iot_client.attach_thing_principal(
+            thingName=thing_name,
+            principal=new_cert_arn
+        )
+
+        # Attach policy to the new certificate
+        iot_client.attach_policy(
+            policyName=AwsIoTService.POLICY_NAME,
+            target=new_cert_arn
+        )
+
+         # Add the thing to a thing group
+        try:
+            iot_client.add_thing_to_thing_group(
+                thingGroupName=AwsIoTService.AWS_IOT_THING_GROUP_NAME,
+                thingName=thing_name
+            )
+            
+        except Exception as e:
+            print(f"Failed to add {thing_name} to group {AwsIoTService.AWS_IOT_THING_GROUP_NAME}. Error: {e}")
+            return None
+        
+         # Create and update the device shadow
+        shadow_update = {
+            "state": {
+                "reported": {
+                    "status": "active"
+                }
+            }
+        }
+        shadow_topic = f"$aws/things/{thing_name}/shadow/update"
+        
+        mqtt_connection.publish(
+            topic=shadow_topic,
+            payload=json.dumps(shadow_update),
+            qos=mqtt.QoS.AT_LEAST_ONCE
+        )
+        
+        response_data = {
+            "new_cert_arn": new_cert_arn,
+            "new_cert_pem": new_cert_pem,
+            "new_key_pem": new_key_pem,
+            "new_public_key_pem": new_public_key_pem
+        }
+
+        return response_data
+
+    @staticmethod
+    def connect_mqtt():
+        if AwsIoTService.mqtt_connection is not None:
+            # Check if the connection is still active
+            if AwsIoTService.mqtt_connection.is_connected():
+                return AwsIoTService.mqtt_connection
+            
+        mqtt_connection = mqtt_connection_builder.mtls_from_path(
+            endpoint=AwsIoTService.TARGET_EP,
+            port=8883,
+            cert_filepath=AwsIoTService.CLAIM_CERT_FILEPATH,
+            pri_key_filepath=AwsIoTService.CLAIM_PRIVATE_KEY_FILE_PATH,
+            client_bootstrap=AwsIoTService.CLIENT_BOOTSTRAP,
+            ca_filepath=AwsIoTService.CA_FILEPATH,
+            on_connection_interrupted=AwsIoTService.on_connection_interrupted,
+            on_connection_resumed=AwsIoTService.on_connection_resumed,
+            client_id=AwsIoTService.PROVISIONING_TEMPLATE_NAME,
+            clean_session=True,
+            keep_alive_secs=30
+        )
+
+        max_retries = 5
+        attempt = 0
+
+        while attempt < max_retries:
+            try:
+                connect_future = mqtt_connection.connect()
+                connect_future.result()  # Wait until connected
+            except Exception as e:  # Log the exception details
+                attempt += 1
+                print(f"Connection to IoT Core failed (attempt {attempt}/{max_retries})... retrying in 5s. Error: {str(e)}")
+                time.sleep(5)
+                if attempt >= max_retries:
+                    print("Max retries reached. Exiting.")
+                    return None  # Return None on failure
+            else:
+                AwsIoTService.mqtt_connection = mqtt_connection
+                return mqtt_connection  # Return the successful connection
+        
+        return None
+
+    @staticmethod
+    def on_connection_interrupted(connection, error, **kwargs):
+        """
+        Callback for when the connection is interrupted.
+        
+        Args:
+            connection (awsiot.mqtt.MqttConnection): The connection that was interrupted.
+            error (Exception): The error that caused the interruption.
+        """
+        print("Connection interrupted. error: {}".format(error))
+
+    @staticmethod
+    def on_connection_resumed(connection, return_code, session_present, **kwargs):
+        """
+        Callback for when the connection is resumed.
+        
+        Args:
+            connection (awsiot.mqtt.MqttConnection): The connection that was resumed.
+            return_code (int): The return code from the server.
+            session_present (bool): Whether the session was present.
+        """
+        print("Connection resumed. return_code: {} session_present: {}".format(return_code, session_present))
+
+        if return_code == mqtt.ConnectReturnCode.ACCEPTED and not session_present:
+            print("Session did not persist. Resubscribing to existing topics...")
+            resubscribe_future, _ = connection.resubscribe_existing_topics()
+            resubscribe_future.add_done_callback(AwsIoTService.on_resubscribe_complete)
+
+    @staticmethod
+    def on_resubscribe_complete(resubscribe_future):
+        """
+        Callback for when resubscription to topics is complete.
+        
+        Args:
+            resubscribe_future (concurrent.futures.Future): The future representing the resubscription result.
+        """
+        resubscribe_results = resubscribe_future.result()
+        print("Resubscribe results: {}".format(resubscribe_results))
+
+        for topic, qos in resubscribe_results['topics']:
+            if qos is None:
+                sys.exit("Server rejected resubscribe to topic: {}".format(topic))
+
+    @staticmethod
+    def on_message_received(topic, payload, dup, qos, retain, **kwargs):
+        """
+        Callback for when a message is received on a subscribed topic.
+        
+        Args:
+            topic (str): The topic on which the message was received.
+            payload (bytes): The message payload.
+            dup (bool): Whether the message is a duplicate.
+            qos (awsiot.mqtt.QoS): The Quality of Service level.
+            retain (bool): Whether the message is retained.
+        """
+        print("Received message from topic '{}': {}".format(topic, payload))
         
 
 class TokenService:
