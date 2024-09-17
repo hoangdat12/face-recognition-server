@@ -28,6 +28,14 @@ class TurnOnDevice(WebsocketConsumer):
             # Parse incoming WebSocket message
             data = json.loads(text_data)
             data["isTurnOn"] = data.get("status") == "TURN_ON"
+
+            print(data)
+
+            # Update Shadow Device
+            device_name = data["device"]
+            device_status = data["status"]
+    
+            # Create history
             
             # Broadcast message to the group
             async_to_sync(self.channel_layer.group_send)(

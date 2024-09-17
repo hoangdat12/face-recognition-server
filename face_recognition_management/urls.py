@@ -25,7 +25,7 @@ urlpatterns = [
     path('face/registor/host', views.registor_master_account, name="registor_master_account"),
     path('face/registor/employee', views.registration_employees, name="registor_employees"),
     path('face/authenticate', views.authenticate_employees, name="authenticate_employees"),
-
+    path('face/test', views.upload_photo_test, name="upload_photo_test"),
     # account
     path('account/authenticate', views.authenticate_account, name="authenticate_account"),
     path('account/<str:employee_id>', views.disable_employee_in_device, name="disable_employee_in_device"),
@@ -37,9 +37,11 @@ urlpatterns = [
     path('device/generate', views.generate_device_id, name="generate_device_id"),
     path('device/generate/certificate/<str:device_id>', views.generate_certificate_for_device, name="generate_certificate_for_device"),
     path('device/employee/<str:device_id>', views.get_employee_in_device, name="get_employee_in_device"),
+    path('device/update/<str:device_id>', views.update_device_information, name="update_device_information"),
+    path('device/shadow/update/<str:device_id>', views.update_device_shadow, name="update_device_shadow"),
+    path('device/shadow/<str:device_id>', views.get_device_shadow, name="get_device_shadow"),
     path('device/<str:device_id>', views.get_device_detail, name="get_device_detail"),
     path('device/<str:device_id>', views.disable_device, name="disable_device"),
-    path('device/update/<str:device_id>', views.update_device_information, name="update_device_information"),
 
     # history
     # path('history/test', views.generate_data, name="generate_data"),

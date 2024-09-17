@@ -193,7 +193,19 @@ class AwsIoTService:
         shadow_update = {
             "state": {
                 "reported": {
-                    "status": "active"
+                    "fan": {
+                        "status": "off",  # Possible values: "on", "off"
+                        "speed": 3  # Fan speed (e.g., 1-5)
+                    },
+                    "door": {
+                        "status": "off"  # Possible values: "on", "off"
+                    },
+                    "light": {
+                        "status": "on",  # Possible values: "on", "off"
+                        "brightness": 75,  # Light brightness percentage (0-100)
+                        "automate": "off",  # Possible values: "on", "off"
+                        "default_value": "19" # Possible values: 0 - 24 - The time to turn on Light
+                    }
                 }
             }
         }
@@ -221,7 +233,7 @@ class AwsIoTService:
             if AwsIoTService.mqtt_connection.is_connected():
                 return AwsIoTService.mqtt_connection
             
-        mqtt_connection = mqtt_connection_builder.mtls_from_path(
+        AwsIoTService.mqtt_connection = mqtt_connection_builder.mtls_from_path(
             endpoint=AwsIoTService.TARGET_EP,
             port=8883,
             cert_filepath=AwsIoTService.CLAIM_CERT_FILEPATH,
@@ -240,7 +252,7 @@ class AwsIoTService:
 
         while attempt < max_retries:
             try:
-                connect_future = mqtt_connection.connect()
+                connect_future = AwsIoTService.mqtt_connection.connect()
                 connect_future.result()  # Wait until connected
             except Exception as e:  # Log the exception details
                 attempt += 1
@@ -250,8 +262,8 @@ class AwsIoTService:
                     print("Max retries reached. Exiting.")
                     return None  # Return None on failure
             else:
-                AwsIoTService.mqtt_connection = mqtt_connection
-                return mqtt_connection  # Return the successful connection
+                AwsIoTService.mqtt_connection = AwsIoTService.mqtt_connection
+                return AwsIoTService.mqtt_connection  # Return the successful connection
         
         return None
 

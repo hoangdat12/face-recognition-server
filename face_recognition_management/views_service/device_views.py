@@ -8,8 +8,14 @@ from rest_framework.decorators import api_view
 from ..responses import *
 from ..ultils.index import format_user, random_value
 from ..constants import DeviceStatus
+from awscrt import mqtt
+import json
+import boto3
 
 DEFAULT_DEVICE_ID_QUANTITY = 10;
+
+# Initialize the AWS IoT Data client
+iot_client = boto3.client('iot-data', region_name=os.environ.get('AWS_REGION')) 
 
 # S3 bucket name
 s3_bucket_employees = os.environ.get('AWS_S3_BUCKET_EMPLOYEES')
@@ -33,13 +39,29 @@ def generate_device_id(request):
         print(f"Error: {e}")
         return ResponseInternalServerError(message="Add device id to DB failure")
     
+@api_view(["GET"])
+def get_device_shadow(request, device_id):
+    # Find the device using DeviceRepository
+    found_device = DeviceRepository.find_active_by_device_id(device_id)
+    if not found_device:
+        return Response({"message": f"Device with id {device_id} not found"}, status=404)
+    
+    thing_name = f"{AwsIoTService.PROVISIONING_TEMPLATE_NAME}_{device_id}"
+
+    # Retrieve the current shadow state
+    try:
+        response = iot_client.get_thing_shadow(thingName=thing_name)
+        current_shadow = json.loads(response['payload'].read().decode('utf-8'))
+
+        return ResponseOk(data=current_shadow)
+    except Exception as e:
+        return ResponseInternalServerError(message=f"Failed to fetch current shadow state: {str(e)}")
+
 @api_view(['PUT'])
 def update_device_information(request, device_id):
     device_info_name = request.POST.get('name') or request.data.get('name')
     device_automate = request.POST.get('isAutomate') or request.data.get('isAutomate')
     device_default_value = request.POST.get('defaultValue') or request.data.get('defaultValue')
-
-    print(device_automate, device_info_name, device_default_value)
 
     found_device = DeviceRepository.find_active_by_device_id(device_id)
     if not found_device:
@@ -56,6 +78,55 @@ def update_device_information(request, device_id):
     DeviceRepository.save(found_device)
 
     return ResponseOk(data=found_device)
+
+@api_view(['PUT'])
+def update_device_shadow(request, device_id):
+    # Find the device using DeviceRepository
+    found_device = DeviceRepository.find_active_by_device_id(device_id)
+    if not found_device:
+        return Response({"message": f"Device with id {device_id} not found"}, status=404)
+    
+    thing_name = f"{AwsIoTService.PROVISIONING_TEMPLATE_NAME}_{device_id}"
+
+    # Get device name and status from the request
+    device_name = request.data.get('deviceName')  # Possible values: fan, door, light
+    device_status = request.data.get('deviceStatus')  # Status information (e.g., status, speed, brightness)
+
+    # Validate inputs
+    if not device_name or not device_status:
+        return ResponseNotFound(message="Missing deviceName or deviceStatus in the request")
+
+    # Retrieve the current shadow state
+    try:
+        response = iot_client.get_thing_shadow(thingName=thing_name)
+        current_shadow = json.loads(response['payload'].read().decode('utf-8'))
+    except Exception as e:
+        return ResponseInternalServerError(message=f"Failed to fetch current shadow state: {str(e)}")
+
+    print(current_shadow)
+
+    # Initialize the shadow update payload with the current state
+    shadow_update = {
+        "state": {
+            "reported": {
+            }
+        }
+    }
+
+    shadow_update["state"]["reported"] = current_shadow["state"]["reported"]
+    
+    # Update the relevant device information
+    shadow_update["state"]["reported"][device_name] = device_status
+    
+    # Publish the shadow update payload
+    try:
+        iot_client.update_thing_shadow(
+            thingName=thing_name,
+            payload=json.dumps(shadow_update)
+        )
+        return ResponseOk(data=shadow_update)
+    except Exception as e:
+        return ResponseInternalServerError(message= f"Failed to update device shadow: {str(e)}")
 
 
 @api_view(["GET"])

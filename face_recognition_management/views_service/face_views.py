@@ -182,3 +182,24 @@ def authenticate_employees(request):
     
     except Exception as e:
         return ResponseInternalServerError()
+
+@api_view(['POST'])
+def upload_photo_test(request):
+    if request.method == 'POST':
+        print(request.FILES)
+        if 'file' in request.FILES:
+            image_data = request.FILES['file'].read()
+            # Save file to the default storage
+            image_filename = f"{int(time.time() * 1000)}-test.jpg"
+            # S3 upload
+            isSuccess = S3Service.put_object(s3_bucket_employees, image_filename, image_data)
+            if not isSuccess:
+                return ResponseInternalServerError(message="Upload failure")
+            # Optionally, save file information to the database
+            # photo = Photo(image=file_path)
+            # photo.save()
+            return ResponseOk(message="Thanh cong")
+        else:
+            print("error")
+            return ResponseInternalServerError(message="That bai")
+    return ResponseInternalServerError(message="That bai")
