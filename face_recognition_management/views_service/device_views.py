@@ -201,3 +201,26 @@ def generate_certificate_for_device(_, device_id):
     }
 
     return ResponseOk(message="Generate Certificate success!", data=response_data)
+
+@api_view(["POST"])
+def control_device_door(request):
+    device_id = request.POST.get('deviceId') or request.data.get('deviceId')
+    door_status = request.POST.get('doorStatus') or request.data.get('doorStatus')
+
+    found_device = DeviceRepository.find_by_device_id(device_id)
+    if not found_device:
+        return ResponseNotFound(message=f"Device with id {device_id} not found")
+    
+    message = {
+        "type": "Control/Door",
+        "message": door_status,
+        "device_id": device_id
+    }
+    aws_iot_cdt = "pbl/device/control/door"
+
+    isSuccess = AwsIoTService.publish_message(topic=aws_iot_cdt, message=message)
+    if (isSuccess):
+        return ResponseOk(message="Success")
+    else:
+        return ResponseInternalServerError(message="Can't not publish message!")
+

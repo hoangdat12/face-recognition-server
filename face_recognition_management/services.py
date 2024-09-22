@@ -3,6 +3,7 @@ from botocore.exceptions import ClientError
 from datetime import datetime, timedelta, timezone
 from awscrt import io, mqtt
 from awsiot import mqtt_connection_builder
+from awscrt.exceptions import AwsCrtError
 import jwt
 import sys
 import time
@@ -149,9 +150,8 @@ class AwsIoTService:
         thing_name = f"{AwsIoTService.PROVISIONING_TEMPLATE_NAME}_{device_id}"
 
         # Connect to IoT Core using the claim certificate
-        mqtt_connection = AwsIoTService.connect_mqtt()
-        if mqtt_connection is None:
-            return None
+        if not AwsIoTService.mqtt_connection:
+            AwsIoTService.connect_mqtt()
 
         # Create an IoT client to request new keys and certificate
         iot_client = boto3.client('iot', region_name=AwsIoTService.AWS_REGION)
@@ -211,7 +211,7 @@ class AwsIoTService:
         }
         shadow_topic = f"$aws/things/{thing_name}/shadow/update"
         
-        mqtt_connection.publish(
+        AwsIoTService.mqtt_connection.publish(
             topic=shadow_topic,
             payload=json.dumps(shadow_update),
             qos=mqtt.QoS.AT_LEAST_ONCE
@@ -225,6 +225,40 @@ class AwsIoTService:
         }
 
         return response_data
+    
+    @staticmethod
+    def publish_message(topic, message):
+        """
+        Phương thức này publish tin nhắn JSON lên một topic MQTT.
+        
+        :param topic: Topic MQTT mà bạn muốn gửi tin nhắn tới
+        :param message: Dữ liệu tin nhắn, dưới dạng dictionary (sẽ được chuyển thành JSON)
+        """
+        print(AwsIoTService.mqtt_connection)
+        if not AwsIoTService.mqtt_connection:
+            AwsIoTService.connect_mqtt()
+
+        try:
+            # Attempt to publish the message
+            AwsIoTService.mqtt_connection.publish(
+                topic=topic,
+                payload=json.dumps(message),  # Convert message dictionary to JSON string
+                qos=mqtt.QoS.AT_LEAST_ONCE    # Set QoS to ensure the message is delivered at least once
+            )
+            print(f"Published message to {topic}: {json.dumps(message)}")
+            return True
+        
+        except AwsCrtError as e:
+            # Catch any errors related to AWS IoT or MQTT
+            print(f"Failed to publish message to {topic}: {str(e)}")
+            return False
+
+        except Exception as e:
+            # Catch any other general exceptions
+            print(f"An unexpected error occurred: {str(e)}")
+            return False
+        
+        return True
 
     @staticmethod
     def connect_mqtt():

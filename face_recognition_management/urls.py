@@ -42,6 +42,7 @@ urlpatterns = [
     path('device/shadow/<str:device_id>', views.get_device_shadow, name="get_device_shadow"),
     path('device/<str:device_id>', views.get_device_detail, name="get_device_detail"),
     path('device/<str:device_id>', views.disable_device, name="disable_device"),
+    path('device/control/door', views.control_device_door, name="control_device_door"),
 
     # history
     # path('history/test', views.generate_data, name="generate_data"),
