@@ -23,7 +23,7 @@ class Prefix(Enum):
 
 class AuthenticateMethod(Enum):
     FACE_RECOGNITION='face'
-    ACCOUNT='account'
+    RFID='rfid'
 
 class BlackListReson(Enum):
     LOGOUT='logout'

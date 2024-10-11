@@ -42,6 +42,15 @@ class UserRepository:
         if not found_account["Items"]:
             return None
         return found_account["Items"][0]
+    
+    @staticmethod
+    def find_by_rfid_id(rfid_id):
+        found_account = user_table.scan(
+            FilterExpression=boto3.dynamodb.conditions.Attr('rfid_id').eq(rfid_id)
+        )
+        if not found_account["Items"]:
+            return None
+        return found_account["Items"][0]
         
 
     @staticmethod

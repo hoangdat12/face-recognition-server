@@ -23,6 +23,7 @@ def registor_master_account(request):
         device_id = request.POST.get('deviceId') or request.data.get('deviceId')
         username = request.POST.get('username') or request.data.get('username')
         password = request.POST.get('password') or request.data.get('password')
+        rfid_id = request.POST.get('rfidId') or request.data.get('rfidId')
         image_data = request.FILES['image'].read()  
         
         # Check device
@@ -39,6 +40,10 @@ def registor_master_account(request):
         found_account = UserRepository.find_by_username(username)
         if found_account:
             return ResponseBadRequest(message="Username is already exist")
+        
+        found_account_with_rfid = UserRepository.find_by_rfid_id(rfid_id=rfid_id)
+        if found_account_with_rfid:
+            return ResponseBadRequest(message="RFID is already exist")
 
         image_filename = f"{device_id}/{int(time.time() * 1000)}-{username}.jpg"
 
@@ -69,6 +74,7 @@ def registor_master_account(request):
                 'password': encrypted_password,
                 'image': image_filename,
                 'creation_time': datetime.now().isoformat(),
+                'rfid': rfid_id,
                 'role': Role.HOST.value,
                 'status': UserAccountStatus.ACTIVE.value
             })
@@ -81,16 +87,20 @@ def registor_master_account(request):
 @api_view(['POST'])
 def registration_employees(request):
     if request.method == 'POST':
+        print(request.data)
         try:
             # Extract JSON body
             registor_id = request.POST.get('registorId') or request.data.get('registorId')
             username = request.POST.get('username') or request.data.get('username')
-            password = request.POST.get('password') or request.data.get('password')
+            password = (request.POST.get('password') or request.data.get('password')) or "1"
             first_name = request.POST.get('firstName') or request.data.get('firstName')
             last_name = request.POST.get('lastName') or request.data.get('lastName')
             position = request.POST.get('position') or request.data.get('position')
             gender = request.POST.get('gender') or request.data.get('gender')
+            rfid_id = request.POST.get('rfidId') or request.data.get('rfidId')
             image_data = request.FILES['image'].read()  
+            department = request.POST.get('department') or request.data.get('department')
+
             # Query DynamoDB
             found_registor = UserRepository.find_active_user_by_id(registor_id)
             # Check if any items were found
@@ -98,17 +108,21 @@ def registration_employees(request):
                 return ResponseNotFound(message="Registor not found!")
             device_id = found_registor["device_id"]
 
-           # DynamoDB scan
+            # DynamoDB scan
             found_account = UserRepository.find_by_username(username)
             if found_account:
                 return ResponseBadRequest(message="Username is already exist")
-
+            
+            found_account_with_id = UserRepository.find_by_rfid_id(rfid_id=rfid_id)
+            if found_account_with_id:
+                return ResponseBadRequest(message="RFID ID is already exist")
+            
             # Encrypt password
             encrypted_password = password_encrypt(password)
-            
+
             # Generate a unique filename
             image_filename = f"{device_id}/{int(time.time() * 1000)}-{username}.jpg"
-
+            
             # Upload the image to S3
             isSuccess = S3Service.put_object(s3_bucket_employees, image_filename, image_data)
             if not isSuccess:
@@ -134,7 +148,9 @@ def registration_employees(request):
                 'first_name': first_name,
                 'last_name': last_name,
                 'position': position,
+                'rfid_id': rfid_id,
                 'gender': gender,
+                'deparment': department,
             })
             
             return ResponseOk(message="User registered successfully!")

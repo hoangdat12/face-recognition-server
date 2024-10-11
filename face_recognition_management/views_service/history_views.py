@@ -1,8 +1,10 @@
 from rest_framework.decorators import api_view
 from rest_framework.decorators import api_view
 from ..responses import *
-from ..repository import DeviceRepository, HistoryRepository
-from ..ultils.index import is_valid_date, format_date, get_start_key, get_histories_response
+from ..repository import DeviceRepository, HistoryRepository, UserRepository
+from ..ultils.index import is_valid_date, format_date, get_start_key, get_histories_response, generate_user_information
+from ..constants import AuthenticateMethod
+from datetime import datetime
 
 @api_view(["GET"])
 # @permission([Role.HOST.value, Role.ADMIN.value, Role.SUPER.value])
@@ -65,6 +67,45 @@ def get_history_by_date(request, device_id):
     response_data = get_histories_response(histories)
 
     return ResponseOk(data=response_data)
+
+
+@api_view(["GET"])
+def get_histories_by_date(request):
+    date_str = request.GET.get('date', None)
+
+    if not date_str:
+        return ResponseBadRequest("Missing Date")
+
+    timestamp = datetime.strptime(date_str, '%Y-%m-%d')
+    date_query = timestamp.strftime('%Y-%m-%d')
+    histories = HistoryRepository.get_histories_by_date(date=date_query)
+
+    seen_ids = set()
+    unique_histories = list(
+        map(lambda x: x if x['id'] not in seen_ids and not seen_ids.add(x['id']) else None, histories)
+    )
+    unique_histories = [history for history in unique_histories if history is not None]
+    return ResponseOk(data=unique_histories, message="Success")
+
+@api_view(["POST"])
+def verify_rfid_id(request):
+    rfid_id = request.POST.get('rfid_id') or request.data.get('rfid_id')
+
+    found_account = UserRepository.find_by_rfid_id(rfid_id=rfid_id)
+    if not found_account:
+        return ResponseNotFound(message="Khong hop le")
+
+    # found_account = UserRepository.find_by_id(user_id=rfid_id)
+    # if not found_account:
+    #     return ResponseNotFound(message="Khong hop le")
+
+    HistoryRepository.create_history(
+        user_id=found_account["id"], 
+        user_information=generate_user_information(found_account), 
+        authenticate_with= AuthenticateMethod.RFID.value
+    )
+
+    return ResponseOk(data=None, message="Success!")
 
 @api_view(["GET"])
 def generate_data(request):

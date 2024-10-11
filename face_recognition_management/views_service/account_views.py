@@ -3,13 +3,13 @@ from rest_framework.decorators import api_view
 import os
 import time
 import json
-from ..repository import UserRepository, HistoryRepository
+from ..repository import UserRepository
 from ..decorators import permission
-from ..constants import UserAccountStatus, Role, AuthenticateMethod
+from ..constants import UserAccountStatus, Role
 from ..services import TokenService, S3Service
 from rest_framework.decorators import api_view
 from ..responses import *
-from ..ultils.index import check_password, format_user, generate_user_information, password_encrypt
+from ..ultils.index import check_password, format_user, password_encrypt
 
 # S3 bucket name
 s3_bucket_employees = os.environ.get('AWS_S3_BUCKET_EMPLOYEES')
@@ -38,12 +38,6 @@ def authenticate_account(request):
             # Generate token
             if 'password' in found_account:
                 del found_account['password']
-            
-            HistoryRepository.create_history(
-                device_id=found_account["device_id"], 
-                user_information=generate_user_information(found_account), 
-                authenticate_with= AuthenticateMethod.ACCOUNT.value
-            )
 
             found_account["image"] = S3Service.presigned_url(s3_bucket_employees, found_account["image"])
             data = {

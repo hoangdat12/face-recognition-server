@@ -26,6 +26,7 @@ urlpatterns = [
     path('face/registor/employee', views.registration_employees, name="registor_employees"),
     path('face/authenticate', views.authenticate_employees, name="authenticate_employees"),
     path('face/test', views.upload_photo_test, name="upload_photo_test"),
+    
     # account
     path('account/authenticate', views.authenticate_account, name="authenticate_account"),
     path('account/<str:employee_id>', views.disable_employee_in_device, name="disable_employee_in_device"),
@@ -44,9 +45,13 @@ urlpatterns = [
     path('device/<str:device_id>', views.disable_device, name="disable_device"),
     path('device/control/door', views.control_device_door, name="control_device_door"),
 
+    # attendance
+    path('attendance/rfid', views.verify_rfid_id, name="verify_rfid_id"),
+
     # history
     # path('history/test', views.generate_data, name="generate_data"),
     path('history/date/<str:device_id>', views.get_history_by_date, name="get_history_by_date"),
+    path('history/date', views.get_histories_by_date, name="get_histories_by_date"),
     path('history/<str:device_id>', views.get_history, name="get_history"),
 
     # history action

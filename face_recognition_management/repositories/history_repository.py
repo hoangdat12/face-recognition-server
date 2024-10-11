@@ -32,15 +32,17 @@ def create_history_item(device_id, item_number):
 
 class HistoryRepository:
     @staticmethod
-    def create_history(device_id, user_information, authenticate_with):
+    def create_history(user_id, user_information, authenticate_with):
         timestamp = datetime.now() 
         created_at = timestamp.strftime('%Y-%m-%dT%H:%M:%S')  
+        created_date = timestamp.strftime('%Y-%m-%d')
         item = {
-            'id': device_id,
+            'id': user_id,
             'created_at': created_at,
             'authenticate_with': authenticate_with,
             'employee_information': user_information,
-            'updated_at': created_at  
+            'created_date': created_date,
+            'check_in': True,
         }
         history_table.put_item(Item=item)
         return item
@@ -129,6 +131,14 @@ class HistoryRepository:
         
         return items, last_evaluated_key
     
+    @staticmethod
+    def get_histories_by_date(date):
+        histories = history_table.query(
+            IndexName='created_date-created_at-index', 
+            KeyConditionExpression=Key('created_date').eq(date)
+        )
+        return histories.get('Items', [])
+
     @staticmethod
     def generate_test_data(device_id, number_of_items=50):
         """Generate test data and put items into DynamoDB."""

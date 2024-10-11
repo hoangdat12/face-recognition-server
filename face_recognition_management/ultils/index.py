@@ -66,7 +66,8 @@ def generate_user_information(user_device):
     return {
         "id": user_device["id"],
         "name": f"{user_device['first_name']} {user_device['last_name']}",
-        "image": user_device["image"]
+        "image": user_device["image"],
+        "deparment": user_device["deparment"]
     }
 
 def get_histories_response(histories):
