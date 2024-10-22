@@ -11,7 +11,7 @@ from ..services import S3Service, RekognitionService
 from datetime import datetime
 from rest_framework.decorators import api_view
 from ..responses import *
-from ..ultils.index import password_encrypt, generate_user_information, format_user
+from ..ultils.index import password_encrypt, generate_user_information, format_user, get_current_date
 
 # S3 bucket name
 s3_bucket_employees = os.environ.get('AWS_S3_BUCKET_EMPLOYEES')
@@ -87,7 +87,6 @@ def registor_master_account(request):
 @api_view(['POST'])
 def registration_employees(request):
     if request.method == 'POST':
-        print(request.data)
         try:
             # Extract JSON body
             registor_id = request.POST.get('registorId') or request.data.get('registorId')
@@ -100,6 +99,7 @@ def registration_employees(request):
             rfid_id = request.POST.get('rfidId') or request.data.get('rfidId')
             image_data = request.FILES['image'].read()  
             department = request.POST.get('department') or request.data.get('department')
+            employee_id = request.POST.get('employeeId') or request.data.get('employeeId')
 
             # Query DynamoDB
             found_registor = UserRepository.find_active_user_by_id(registor_id)
@@ -131,7 +131,7 @@ def registration_employees(request):
             # Indexing face
             collection_id = f'{device_id}-{Prefix.REKOGNITION_COLLECTION_PREFIX.value}'
 
-            index_face_response = RekognitionService.index_face(image_filename, username, collection_id)
+            index_face_response = RekognitionService.index_face(image_filename, username.replace("@gmail.com", ""), collection_id)
             if not index_face_response["isSuccess"]:
                 return ResponseInternalServerError(message=index_face_response["message"])
 
@@ -151,6 +151,7 @@ def registration_employees(request):
                 'rfid_id': rfid_id,
                 'gender': gender,
                 'deparment': department,
+                'employee_id': employee_id
             })
             
             return ResponseOk(message="User registered successfully!")
@@ -166,14 +167,17 @@ def registration_employees(request):
 @api_view(['POST'])
 def authenticate_employees(request):
     try:
-        image_data = request.FILES['image'].read()  
-        device_id = request.POST.get('deviceId') or request.data.get('deviceId')
+        image_data = request.FILES['file'].read()
+        device_id = request.POST.get('deviceId') or request.data.get('deviceId') or "BC5BPV21X0"
         # Extract image data and generate a unique filename
         collection_id = f'{device_id}-{Prefix.REKOGNITION_COLLECTION_PREFIX.value}'
-
         # Search for the face in the Rekognition collection
-        face_id = RekognitionService.authenticate(collection_id, image_data)
-        if not face_id:
+        try:
+            face_id = RekognitionService.authenticate(collection_id, image_data)
+            if not face_id:
+                return ResponseUnAuthorized(message="Authentication failed: No matching face found.")
+        except Exception as e:
+            print(f"Error: {e}")
             return ResponseUnAuthorized(message="Authentication failed: No matching face found.")
         
         # Check if any items were found
@@ -184,11 +188,20 @@ def authenticate_employees(request):
         if (found_user["device_id"] != device_id):
             return ResponseUnAuthorized(message="User not exist in devices")
         
+        current_date = get_current_date()
+        latest_record = HistoryRepository.get_latest_record(found_user["id"], current_date)
+        if (latest_record):
+            status = "Check In" if (latest_record["status"] == "Check out") else "Check out"
+        else:
+            status = "Check In"
+        print(found_user)
+        
         # Save history
         HistoryRepository.create_history(
-            device_id=device_id, 
+            user_id=found_user["id"], 
             user_information=generate_user_information(found_user), 
-            authenticate_with= AuthenticateMethod.FACE_RECOGNITION.value
+            authenticate_with= AuthenticateMethod.FACE_RECOGNITION.value,
+            status=status
         )
         
         return ResponseOk(data=format_user(found_user), message=f'Authentication successful: Welcome, {found_user["username"]}')
@@ -197,6 +210,7 @@ def authenticate_employees(request):
         return ResponseInternalServerError(message=f'Error retrieving user: {e.response["Error"]["Message"]}')
     
     except Exception as e:
+        print(e)
         return ResponseInternalServerError()
 
 @api_view(['POST'])

@@ -32,7 +32,7 @@ def create_history_item(device_id, item_number):
 
 class HistoryRepository:
     @staticmethod
-    def create_history(user_id, user_information, authenticate_with):
+    def create_history(user_id, user_information, authenticate_with, status = "Check In"):
         timestamp = datetime.now() 
         created_at = timestamp.strftime('%Y-%m-%dT%H:%M:%S')  
         created_date = timestamp.strftime('%Y-%m-%d')
@@ -42,7 +42,8 @@ class HistoryRepository:
             'authenticate_with': authenticate_with,
             'employee_information': user_information,
             'created_date': created_date,
-            'check_in': True,
+            'check_in': True, # Present or absent
+            'status': status
         }
         history_table.put_item(Item=item)
         return item
@@ -138,6 +139,28 @@ class HistoryRepository:
             KeyConditionExpression=Key('created_date').eq(date)
         )
         return histories.get('Items', [])
+    
+    @staticmethod
+    def get_latest_record(user_id, created_at):
+        start_date = f"{created_at}T00:00:00"
+        end_date = f"{created_at}T23:59:59"
+
+        try:
+            response = history_table.query(
+                KeyConditionExpression=Key('id').eq(user_id) & Key('created_at').between(start_date, end_date),
+                ScanIndexForward=False,  # Sort in descending order to get the most recent record first
+                Limit=1  # Only get the most recent record of the day
+            )
+
+            if response['Items']:
+                return response['Items'][0]  # Return the most recent record of the day
+            else:
+                print("No data found for the day")
+                return None
+            
+        except Exception as e:
+            print(e)
+            return None
 
     @staticmethod
     def generate_test_data(device_id, number_of_items=50):

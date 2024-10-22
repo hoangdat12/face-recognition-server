@@ -10,11 +10,51 @@ from ..services import TokenService, S3Service
 from rest_framework.decorators import api_view
 from ..responses import *
 from ..ultils.index import check_password, format_user, password_encrypt
+from datetime import datetime
+import uuid
 
 # S3 bucket name
 s3_bucket_employees = os.environ.get('AWS_S3_BUCKET_EMPLOYEES')
 s3_bucket_guest = os.environ.get('AWS_S3_BUCKET_GUEST')
 
+
+@api_view(['POST'])
+def register_device_account(request):
+    if request.method == 'POST':
+        try:
+            # Extract JSON body
+            username = request.POST.get('username') or request.data.get('username')
+            password = (request.POST.get('password') or request.data.get('password')) or "1"
+            device_id = request.POST.get('deviceId') or request.data.get('deviceId')
+
+            # DynamoDB scan
+            found_account = UserRepository.find_by_username(username)
+            if found_account:
+                return ResponseBadRequest(message="Username is already exist")
+            
+            # Encrypt password
+            encrypted_password = password_encrypt(password)
+
+            # Use Face ID as the primary key (id) in DynamoDB
+            UserRepository.create_user({
+                "id": str(uuid.uuid4()),
+                'device_id': device_id,
+                'username': username,
+                'password': encrypted_password,
+                'creation_time': datetime.now().isoformat(),
+                'role': Role.ADMIN.value,
+                'status': UserAccountStatus.ACTIVE.value,
+            })
+            
+            return ResponseOk(message="User registered successfully!")
+
+        except json.JSONDecodeError:
+            return ResponseBadRequest(message="Invalid JSON data")
+        except Exception as e:
+            print(f"Error: {e}")
+            return ResponseInternalServerError(message="Error registering new employee")
+
+    return JsonResponse({'error': 'Invalid request method'}, status=405)
 
 @api_view(['POST'])
 def authenticate_account(request):
@@ -39,7 +79,9 @@ def authenticate_account(request):
             if 'password' in found_account:
                 del found_account['password']
 
-            found_account["image"] = S3Service.presigned_url(s3_bucket_employees, found_account["image"])
+            if "image" in found_account:
+                found_account["image"] = S3Service.presigned_url(s3_bucket_employees, found_account["image"])
+
             data = {
                 'user': found_account,
                 'refresh': token_pairs["refresh_token"],
@@ -81,6 +123,11 @@ def get_user_information(request, user_id):
 
 @api_view(["GET"])
 def get_roles(request):
+    roles = {role.name: role.value for role in Role}
+    return ResponseOk(data = roles)
+
+@api_view(["GET"])
+def get_users(request):
     roles = {role.name: role.value for role in Role}
     return ResponseOk(data = roles)
 

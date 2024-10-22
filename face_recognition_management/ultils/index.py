@@ -67,7 +67,8 @@ def generate_user_information(user_device):
         "id": user_device["id"],
         "name": f"{user_device['first_name']} {user_device['last_name']}",
         "image": user_device["image"],
-        "deparment": user_device["deparment"]
+        "department": user_device["deparment"],
+        "employee_id": user_device["employee_id"]
     }
 
 def get_histories_response(histories):
@@ -92,3 +93,10 @@ def get_histories_response(histories):
             memo.add(key)
 
     return response_data;
+
+def get_current_date():
+    # Lấy thời gian hiện tại
+    now = datetime.now()
+    # Định dạng thành chuỗi theo định dạng 'YYYY-MM-DD'
+    formatted_date = now.strftime('%Y-%m-%d')
+    return formatted_date

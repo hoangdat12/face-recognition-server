@@ -148,13 +148,15 @@ def get_employee_in_device(request, device_id):
     if not len(device_users):
         return ResponseBadRequest(message="Device id not found")
     
+    updated_users = []
     for device_user in device_users:
-        s3_file_name = device_user["image"];
-        s3_url = S3Service.presigned_url(bucket_name=s3_bucket_employees, file_name=s3_file_name)
-        device_user["image"] = s3_url
-        device_user = format_user(device_user)
-    
-    return ResponseOk(data=device_users)
+        if device_user["role"] != Role.ADMIN.value:
+            s3_file_name = device_user["image"]
+            s3_url = S3Service.presigned_url(bucket_name=s3_bucket_employees, file_name=s3_file_name)
+            device_user["image"] = s3_url
+            updated_users.append(format_user(device_user))
+
+    return ResponseOk(data=updated_users)
 
 @api_view(["DELETE"])
 # @permission([Role.ADMIN.value, Role.SUPER.value])
@@ -224,3 +226,20 @@ def control_device_door(request):
     else:
         return ResponseInternalServerError(message="Can't not publish message!")
 
+@api_view(["POST"])
+def take_picture(request):
+    client_id = request.POST.get('clientId') or request.data.get('clientId')
+
+    message = {
+        "type": "Control/Camera",
+        "message": "Take picture",
+        "clientId": client_id
+    }
+
+    aws_iot_cdt = "pbl/device/control/camera"
+
+    isSuccess = AwsIoTService.publish_message(topic=aws_iot_cdt, message=message)
+    if (isSuccess):
+        return ResponseOk(message="Success")
+    else:
+        return ResponseInternalServerError(message="Can't not publish message!")

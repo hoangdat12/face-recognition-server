@@ -2,7 +2,7 @@ from rest_framework.decorators import api_view
 from rest_framework.decorators import api_view
 from ..responses import *
 from ..repository import DeviceRepository, HistoryRepository, UserRepository
-from ..ultils.index import is_valid_date, format_date, get_start_key, get_histories_response, generate_user_information
+from ..ultils.index import is_valid_date, format_date, get_start_key, get_histories_response, generate_user_information, get_current_date
 from ..constants import AuthenticateMethod
 from datetime import datetime
 
@@ -78,6 +78,7 @@ def get_histories_by_date(request):
 
     timestamp = datetime.strptime(date_str, '%Y-%m-%d')
     date_query = timestamp.strftime('%Y-%m-%d')
+    
     histories = HistoryRepository.get_histories_by_date(date=date_query)
 
     seen_ids = set()
@@ -99,10 +100,19 @@ def verify_rfid_id(request):
     # if not found_account:
     #     return ResponseNotFound(message="Khong hop le")
 
+    current_date = get_current_date()
+
+    latest_record = HistoryRepository.get_latest_record(found_account["id"], current_date)
+
+    status = (
+                latest_record["status"] if "status" in latest_record else "Check In"
+            ) if (latest_record["status"] == "Check in") else "Check out"
+
     HistoryRepository.create_history(
         user_id=found_account["id"], 
         user_information=generate_user_information(found_account), 
-        authenticate_with= AuthenticateMethod.RFID.value
+        authenticate_with= AuthenticateMethod.RFID.value,
+        status = status
     )
 
     return ResponseOk(data=None, message="Success!")

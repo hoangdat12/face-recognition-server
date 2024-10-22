@@ -28,6 +28,7 @@ urlpatterns = [
     path('face/test', views.upload_photo_test, name="upload_photo_test"),
     
     # account
+    path('account/register', views.register_device_account, name="register_device_account"),
     path('account/authenticate', views.authenticate_account, name="authenticate_account"),
     path('account/<str:employee_id>', views.disable_employee_in_device, name="disable_employee_in_device"),
     path('account/detail/<str:user_id>', views.get_user_information, name="get_user_information"),
@@ -44,6 +45,7 @@ urlpatterns = [
     path('device/<str:device_id>', views.get_device_detail, name="get_device_detail"),
     path('device/<str:device_id>', views.disable_device, name="disable_device"),
     path('device/control/door', views.control_device_door, name="control_device_door"),
+    path('device/control/camera/take-picture', views.take_picture, name="take_picture"),
 
     # attendance
     path('attendance/rfid', views.verify_rfid_id, name="verify_rfid_id"),
