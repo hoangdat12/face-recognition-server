@@ -101,7 +101,7 @@ def authenticate_account(request):
 
 @api_view(["DELETE"])
 # @permission([Role.HOST.value, Role.ADMIN.value, Role.SUPER.value])
-def disable_employee_in_device(request, employee_id):
+def disable_employee_in_device(_, employee_id):
     found_user = UserRepository.find_active_user_by_id(employee_id);
     if not found_user:
         return ResponseNotFound(message="User not found")

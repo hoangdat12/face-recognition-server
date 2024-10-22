@@ -2,7 +2,7 @@ import os
 from rest_framework.decorators import api_view
 from ..repository import UserRepository, DeviceRepository
 from ..decorators import permission
-from ..constants import Role
+from ..constants import Role, UserAccountStatus
 from ..services import S3Service, AwsIoTService
 from rest_framework.decorators import api_view
 from ..responses import *
@@ -147,10 +147,10 @@ def get_employee_in_device(request, device_id):
     device_users = UserRepository.find_users_device(device_id)
     if not len(device_users):
         return ResponseBadRequest(message="Device id not found")
-    
+
     updated_users = []
     for device_user in device_users:
-        if device_user["role"] != Role.ADMIN.value:
+        if device_user["role"] != Role.ADMIN.value and device_user["status"] != UserAccountStatus.DELETED.value:
             s3_file_name = device_user["image"]
             s3_url = S3Service.presigned_url(bucket_name=s3_bucket_employees, file_name=s3_file_name)
             device_user["image"] = s3_url

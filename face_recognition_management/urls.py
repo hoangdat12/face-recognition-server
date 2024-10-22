@@ -30,10 +30,10 @@ urlpatterns = [
     # account
     path('account/register', views.register_device_account, name="register_device_account"),
     path('account/authenticate', views.authenticate_account, name="authenticate_account"),
-    path('account/<str:employee_id>', views.disable_employee_in_device, name="disable_employee_in_device"),
     path('account/detail/<str:user_id>', views.get_user_information, name="get_user_information"),
     path('account/update/<str:user_id>', views.update_account_information, name="update_account_information"),
     path('account/update/avatar/<str:user_id>', views.update_account_avatar, name="update_account_avatar"),
+    path('account/<str:employee_id>', views.disable_employee_in_device, name="disable_employee_in_device"),
 
     # device
     path('device/generate', views.generate_device_id, name="generate_device_id"),

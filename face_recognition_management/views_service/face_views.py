@@ -185,7 +185,7 @@ def authenticate_employees(request):
         if not found_user:
             return ResponseNotFound(message="User not found!")
         
-        if (found_user["device_id"] != device_id):
+        if (found_user["device_id"] != device_id or found_user["status"] != UserAccountStatus.ACTIVE.value):
             return ResponseUnAuthorized(message="User not exist in devices")
         
         current_date = get_current_date()
@@ -194,7 +194,6 @@ def authenticate_employees(request):
             status = "Check In" if (latest_record["status"] == "Check out") else "Check out"
         else:
             status = "Check In"
-        print(found_user)
         
         # Save history
         HistoryRepository.create_history(
