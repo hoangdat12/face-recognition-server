@@ -86,7 +86,25 @@ def get_histories_by_date(request):
         map(lambda x: x if x['id'] not in seen_ids and not seen_ids.add(x['id']) else None, histories)
     )
     unique_histories = [history for history in unique_histories if history is not None]
+
     return ResponseOk(data=unique_histories, message="Success")
+
+
+@api_view(["GET"])
+def get_detail_histories(request):
+    date_str = request.GET.get('date', None)
+    user_id = request.GET.get('userId', None)
+
+    if not date_str or not user_id:
+        return ResponseBadRequest("Missing Request Data")
+
+    timestamp = datetime.strptime(date_str, '%Y-%m-%d')
+    date_query = timestamp.strftime('%Y-%m-%d')
+    
+    histories = HistoryRepository.get_histories_detail(user_id=user_id, date_query=date_query)
+    print(histories)
+
+    return ResponseOk(data=histories, message="Success")
 
 @api_view(["POST"])
 def verify_rfid_id(request):
@@ -103,10 +121,12 @@ def verify_rfid_id(request):
     current_date = get_current_date()
 
     latest_record = HistoryRepository.get_latest_record(found_account["id"], current_date)
-
-    status = (
-                latest_record["status"] if "status" in latest_record else "Check In"
-            ) if (latest_record["status"] == "Check in") else "Check out"
+    if (latest_record):
+        current_status = latest_record["status"]
+        if (current_status == "Check in"): status = "Check out";
+        else: status = "Check in"
+    else:
+        status = "Check in";
 
     HistoryRepository.create_history(
         user_id=found_account["id"], 

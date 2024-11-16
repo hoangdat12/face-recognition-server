@@ -141,6 +141,17 @@ class HistoryRepository:
         return histories.get('Items', [])
     
     @staticmethod
+    def get_histories_detail(user_id, date_query):
+        histories = history_table.scan(
+            FilterExpression="employee_information.id = :eid AND created_date = :cdate",
+            ExpressionAttributeValues={
+                ":eid": user_id,
+                ":cdate": date_query
+            }
+        )
+        return histories.get('Items', [])
+    
+    @staticmethod
     def get_latest_record(user_id, created_at):
         start_date = f"{created_at}T00:00:00"
         end_date = f"{created_at}T23:59:59"

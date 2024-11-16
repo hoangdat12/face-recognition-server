@@ -54,6 +54,7 @@ urlpatterns = [
     # path('history/test', views.generate_data, name="generate_data"),
     path('history/date/<str:device_id>', views.get_history_by_date, name="get_history_by_date"),
     path('history/date', views.get_histories_by_date, name="get_histories_by_date"),
+    path('history/detail', views.get_detail_histories, name="get_detail_histories"),
     path('history/<str:device_id>', views.get_history, name="get_history"),
 
     # history action
