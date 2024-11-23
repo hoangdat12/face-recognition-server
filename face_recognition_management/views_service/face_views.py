@@ -190,10 +190,13 @@ def authenticate_employees(request):
         
         current_date = get_current_date()
         latest_record = HistoryRepository.get_latest_record(found_user["id"], current_date)
-        if (latest_record):
-            status = "Check In" if (latest_record["status"] == "Check out") else "Check out"
-        else:
-            status = "Check In"
+
+        # if (latest_record):
+        #     status = "Check In" if (latest_record["status"] == "Check out") else "Check out"
+        # else:
+        #     status = "Check In"
+
+        status = "Check In"
         
         # Save history
         HistoryRepository.create_history(
@@ -203,7 +206,10 @@ def authenticate_employees(request):
             status=status
         )
         
-        return ResponseOk(data=format_user(found_user), message=f'Authentication successful: Welcome, {found_user["username"]}')
+        return ResponseOk(
+            data=format_user(found_user), 
+            message=f'Authentication successful: Welcome, {found_user["username"]}',
+        )
     
     except ClientError as e:
         return ResponseInternalServerError(message=f'Error retrieving user: {e.response["Error"]["Message"]}')

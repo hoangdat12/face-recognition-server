@@ -188,3 +188,4 @@ def update_account_avatar(request, user_id):
     found_user["image"] = S3Service.presigned_url(bucket_name=s3_bucket_employees, file_name=image_filename)
 
     return ResponseOk(data=format_user(found_user));
+

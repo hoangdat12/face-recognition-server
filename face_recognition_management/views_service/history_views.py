@@ -1,3 +1,5 @@
+from django.http import HttpResponse
+import openpyxl
 from rest_framework.decorators import api_view
 from rest_framework.decorators import api_view
 from ..responses import *
@@ -102,7 +104,6 @@ def get_detail_histories(request):
     date_query = timestamp.strftime('%Y-%m-%d')
     
     histories = HistoryRepository.get_histories_detail(user_id=user_id, date_query=date_query)
-    print(histories)
 
     return ResponseOk(data=histories, message="Success")
 
@@ -141,3 +142,90 @@ def verify_rfid_id(request):
 def generate_data(request):
     HistoryRepository.generate_test_data("BC5BPV21X0", page=4)
     return Response()
+
+@api_view(["GET"])
+def extract_check_in_file(request):
+    date_str = request.GET.get('date', None)
+
+    if not date_str:
+        return ResponseBadRequest("Missing Date")
+
+    timestamp = datetime.strptime(date_str, '%Y-%m-%d')
+    date_query = timestamp.strftime('%Y-%m-%d')
+    
+    histories = HistoryRepository.get_histories_by_date(date=date_query)
+
+    seen_ids = set()
+    unique_histories = list(
+        map(lambda x: x if x['id'] not in seen_ids and not seen_ids.add(x['id']) else None, histories)
+    )
+    unique_histories = [history for history in unique_histories if history is not None]
+
+    workbook = openpyxl.Workbook()
+    worksheet = workbook.active
+    worksheet.title = "Employees"
+
+    # Thêm tiêu đề (header) vào file Excel
+    headers = ['Employee ID', 'Name', 'Department', 'Date', 'Check In']
+    worksheet.append(headers)
+
+    # Ghi dữ liệu vào các dòng của worksheet
+    for history in unique_histories:
+        worksheet.append([
+            history.get("employee_information", {}).get("employee_id", "None"),  # Lấy employee_id hoặc 'None'
+            history.get("employee_information", {}).get("name", "None"),         # Lấy name hoặc 'None'
+            history.get("employee_information", {}).get("department", "None"),    # Lấy department hoặc 'None'
+            history.get('created_date', "None"),                                 # Lấy created_date hoặc 'None'
+            history.get('check_in', "None"),                                     # Lấy check_in hoặc 'None'
+        ])
+    # Tạo HTTP response để trả về file Excel
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = 'attachment; filename="employees.xlsx"'
+
+    # Lưu workbook vào response
+    workbook.save(response)
+
+    return response 
+
+@api_view(["GET"])
+def extract_check_in_detail(request):
+    date_str = request.GET.get('date', None)
+    user_id = request.GET.get('userId', None)
+
+    if not date_str or not user_id:
+        return ResponseBadRequest("Missing Request Data")
+
+    timestamp = datetime.strptime(date_str, '%Y-%m-%d')
+    date_query = timestamp.strftime('%Y-%m-%d')
+    
+    histories = HistoryRepository.get_histories_detail(user_id=user_id, date_query=date_query)
+
+    workbook = openpyxl.Workbook()
+    worksheet = workbook.active
+    worksheet.title = "Employees"
+
+    # Thêm tiêu đề (header) vào file Excel
+    headers = ['Employee ID', 'Name', 'Department', 'Date', 'Check In']
+    worksheet.append(headers)
+
+    # Ghi dữ liệu vào các dòng của worksheet
+    for history in histories:
+        worksheet.append([
+            history.get("employee_information", {}).get("employee_id", "None"),  # Lấy employee_id hoặc 'None'
+            history.get("employee_information", {}).get("name", "None"),         # Lấy name hoặc 'None'
+            history.get("employee_information", {}).get("department", "None"),    # Lấy department hoặc 'None'
+            history.get('created_date', "None"),                                 # Lấy created_date hoặc 'None'
+            history.get('check_in', "None"),                                     # Lấy check_in hoặc 'None'
+        ])
+    # Tạo HTTP response để trả về file Excel
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = 'attachment; filename="employees.xlsx"'
+
+    # Lưu workbook vào response
+    workbook.save(response)
+
+    return response 

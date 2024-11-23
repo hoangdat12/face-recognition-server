@@ -1,4 +1,5 @@
 import os
+from django.http import HttpResponse
 from rest_framework.decorators import api_view
 from ..repository import UserRepository, DeviceRepository
 from ..decorators import permission
@@ -11,6 +12,7 @@ from ..constants import DeviceStatus
 from awscrt import mqtt
 import json
 import boto3
+import openpyxl
 
 DEFAULT_DEVICE_ID_QUANTITY = 10;
 
@@ -243,3 +245,50 @@ def take_picture(request):
         return ResponseOk(message="Success")
     else:
         return ResponseInternalServerError(message="Can't not publish message!")
+    
+
+@api_view(["GET"])
+def export_employee_in_device(request, device_id):
+    found_device_id = DeviceRepository.find_active_by_device_id(device_id)
+    if not found_device_id:
+        return ResponseNotFound(message=f"Device with id {device_id} not found")
+
+    device_users = UserRepository.find_users_device(device_id)
+    if not len(device_users):
+        return ResponseBadRequest(message="Device id not found")
+    
+    employees = []
+    for device_user in device_users:
+        if device_user["role"] != Role.ADMIN.value and device_user["status"] != UserAccountStatus.DELETED.value:
+            employees.append(format_user(device_user))
+    
+    workbook = openpyxl.Workbook()
+    worksheet = workbook.active
+    worksheet.title = "Employees"
+
+    # Thêm tiêu đề (header) vào file Excel
+    headers = ['Employee ID', 'Email', 'First Name', 'Last Name', 'Position', 'Role', 'Department', 'Status']
+    worksheet.append(headers)
+
+    # Ghi dữ liệu vào các dòng của worksheet
+    for emp in employees:
+        worksheet.append([
+            emp['employee_id'], 
+            emp['username'], 
+            emp['first_name'], 
+            emp['last_name'], 
+            emp['position'], 
+            emp['role'], 
+            emp['deparment'], 
+            emp['status']
+        ])
+    # Tạo HTTP response để trả về file Excel
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = 'attachment; filename="employees.xlsx"'
+
+    # Lưu workbook vào response
+    workbook.save(response)
+
+    return response

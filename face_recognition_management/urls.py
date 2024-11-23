@@ -46,6 +46,7 @@ urlpatterns = [
     path('device/<str:device_id>', views.disable_device, name="disable_device"),
     path('device/control/door', views.control_device_door, name="control_device_door"),
     path('device/control/camera/take-picture', views.take_picture, name="take_picture"),
+    path('device/export/employee/<str:device_id>', views.export_employee_in_device, name="export_employee_in_device"),
 
     # attendance
     path('attendance/rfid', views.verify_rfid_id, name="verify_rfid_id"),
@@ -54,7 +55,9 @@ urlpatterns = [
     # path('history/test', views.generate_data, name="generate_data"),
     path('history/date/<str:device_id>', views.get_history_by_date, name="get_history_by_date"),
     path('history/date', views.get_histories_by_date, name="get_histories_by_date"),
+    path('history/extract', views.extract_check_in_file, name="extract_check_in_file"),
     path('history/detail', views.get_detail_histories, name="get_detail_histories"),
+    path('history/extract/detail', views.extract_check_in_detail, name="extract_check_in_detail"),
     path('history/<str:device_id>', views.get_history, name="get_history"),
 
     # history action
