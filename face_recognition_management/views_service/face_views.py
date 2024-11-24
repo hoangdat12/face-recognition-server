@@ -7,7 +7,7 @@ from botocore.exceptions import ClientError
 from ..repository import UserRepository, DeviceRepository, HistoryRepository
 from ..decorators import permission
 from ..constants import Role, Prefix, UserAccountStatus, AuthenticateMethod
-from ..services import S3Service, RekognitionService
+from ..services import S3Service, RekognitionService, AwsIoTService
 from datetime import datetime
 from rest_framework.decorators import api_view
 from ..responses import *
@@ -153,6 +153,19 @@ def registration_employees(request):
                 'deparment': department,
                 'employee_id': employee_id
             })
+            
+
+            # MQTT
+            message = {
+                "type": "SYNC/USER",
+                "message": "Sync data",
+                "rfid": rfid_id,
+                "id": index_face_response.get("face_id", ""),  # Lấy "face_id", nếu không có trả về ""
+                "name": f"{first_name} {last_name}",  # Ghép tên và họ với khoảng trắng
+            }
+            aws_iot_cdt = "pbl/device/employee/add"
+
+            isSuccess = AwsIoTService.publish_message(topic=aws_iot_cdt, message=message)
             
             return ResponseOk(message="User registered successfully!")
 
