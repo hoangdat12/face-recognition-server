@@ -1,4 +1,5 @@
-from django.http import HttpResponse
+import json
+from django.http import HttpResponse, JsonResponse
 import openpyxl
 from rest_framework.decorators import api_view
 from rest_framework.decorators import api_view
@@ -137,6 +138,30 @@ def verify_rfid_id(request):
     )
 
     return ResponseOk(data=None, message="Success!")
+
+@api_view(['POST'])
+def verify_rfid_id_upload(request):
+    try:
+        data = json.loads(request.body)  # Parse JSON từ request
+        for history in data:
+            if history["rfid"] is not None: 
+                rfid_id = history["rfid"];
+                found_account = UserRepository.find_by_rfid_id(rfid_id=rfid_id)
+                if not found_account:
+                    continue;
+
+                status = "Check in";
+
+                HistoryRepository.create_history(
+                    user_id=found_account["id"], 
+                    user_information=generate_user_information(found_account), 
+                    authenticate_with= AuthenticateMethod.RFID.value,
+                    status = status
+                )
+
+        return ResponseOk(data=None, message="Success!")
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Dữ liệu không hợp lệ"}, status=400)
 
 @api_view(["GET"])
 def generate_data(request):

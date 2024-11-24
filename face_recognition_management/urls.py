@@ -50,6 +50,7 @@ urlpatterns = [
 
     # attendance
     path('attendance/rfid', views.verify_rfid_id, name="verify_rfid_id"),
+    path('attendance/rfid/upload', views.verify_rfid_id_upload, name="verify_rfid_id_upload"),
 
     # history
     # path('history/test', views.generate_data, name="generate_data"),
